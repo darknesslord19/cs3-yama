@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bağımsız Domain Ekleyici</title>
+<style>
+:root{--bg:#f1f2f6;--fg:#171a26;--card:#fff;--ln:#d8dae6;--ac:#4a4fd6;--ac2:#4a4fd620;--mu:#5d6278;--wr:#a15c00;--hd:#191b3a;--hf:#eceeff}
+@media(prefers-color-scheme:dark){:root{--bg:#0e0f1a;--fg:#e6e8f5;--card:#161827;--ln:#2a2d45;--ac:#8c90ff;--ac2:#8c90ff1f;--mu:#9296b0;--wr:#e3ac4e;--hd:#0b0c22;--hf:#eceeff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{background:var(--hd);color:var(--hf);padding:22px 16px 20px;border-bottom:3px solid var(--ac)}
+header div{max-width:760px;margin:auto}
+h1{font:700 21px/1.2 system-ui,sans-serif;margin:0 0 4px}
+header p{margin:0;font-size:13.5px;opacity:.75}
+main{max-width:760px;margin:auto;padding:14px 14px 40px}
+section{background:var(--card);border:1px solid var(--ln);border-left:4px solid var(--ac);border-radius:10px;padding:14px;margin-bottom:14px}
+.hd{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--ac);color:#fff;font:700 13px/26px system-ui;text-align:center}
+h2{font-size:16px;margin:0;flex:1}
+.b{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;border:1px solid var(--ln);color:var(--mu);white-space:nowrap}
+.b.ok{background:var(--ac2);border-color:var(--ac);color:var(--ac)}
+.d{margin:0 0 10px;color:var(--mu);font-size:13.5px}.d b{color:var(--fg)}
+.pick{display:inline-block;background:var(--ac);color:#fff;border-radius:8px;padding:10px 16px;font:600 14px system-ui;cursor:pointer;margin-right:8px}
+.pick input{display:none}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:10px 16px;font:600 14px system-ui;margin:8px 8px 0 0}
+button.g{background:transparent;color:var(--ac);border:1px solid var(--ac)}
+input[type=text],textarea{width:100%;background:var(--bg);color:inherit;border:1px solid var(--ln);border-radius:8px;padding:9px;font:13px ui-monospace,Menlo,monospace;margin-top:6px}
+textarea{min-height:60px}
+details{margin-top:10px}summary{cursor:pointer;color:var(--ac);font-size:13.5px;font-weight:600}
+.m{color:var(--mu);font-size:13px;margin-top:4px;word-break:break-all}.w{color:var(--wr)}
+.c{border-top:1px solid var(--ln);padding:10px 0}.c:first-child{border-top:0;padding-top:0}
+.c b{display:block;font:600 13px ui-monospace,Menlo,monospace;word-break:break-all}
+</style></head><body>
+<header><div><h1>Bağımsız Domain Ekleyici</h1><p>Eklentinin içindeki domain'i baz alır, güncel adresi kendi domains.json'undan çeker</p></div></header>
+<main>
+
+<section><div class="hd"><span class="n">1</span><h2>Eklenti dosyaları</h2><span class="b" id="st1">eksik</span></div>
+<p class="d">Domain eklemek istediğin <b>eklentinin smali zip'ini</b> (ör. RENKLİ EKLENTİ.zip) seç. Ana sınıfı (ör. DiziMom) ve içindeki domain'i kendisi bulur. Başka bir paket gerekmez.</p>
+<label class="pick">Eklenti zip / smali seç<input type="file" accept=".smali,.zip,text/plain" multiple onchange="addF(this.files);this.value=''"></label>
+<button class="g" onclick="files=[];$('#err').textContent='';scan()">Temizle</button>
+<div class="m w" id="err"></div>
+<details><summary>Dosya yerine yapıştır</summary>
+<input type="text" id="pn" placeholder="Dosya yolu: dev/site/DiziMom.smali">
+<textarea id="pt" placeholder="Smali içeriği"></textarea>
+<button class="g" onclick="addP()">Ekle</button></details>
+</section>
+
+<section><div class="hd"><span class="n">2</span><h2>domains.json linki</h2><span class="b ok" id="st2">gerekli</span></div>
+<p class="d">Güncel domain'leri tuttuğun dosyanın <b>ham (raw)</b> adresi. Eklenti bu adresi açılışta ve yaklaşık 10 dakikada bir kontrol eder.</p>
+<input type="text" id="url" placeholder="https://raw.githubusercontent.com/KULLANICI/REPO/main/domains.json">
+<button class="g" onclick="loadD()">Anahtarları yükle</button>
+<textarea id="dj" placeholder="İndirilemezse JSON içeriğini buraya yapıştır (anahtar önerileri için)" oninput="setD(this.value)"></textarea>
+<div class="m" id="dm"></div></section>
+
+<section><div class="hd"><span class="n">3</span><h2>Algılananlar ve çıktı</h2></div>
+<div id="cl" class="m">Henüz eklenti dosyası yok.</div>
+<datalist id="kl"></datalist>
+<button onclick="dl()" id="db" style="display:none">Yamalı ZIP indir</button></section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const rx=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const RQ='Lcom/lagradost/nicehttp/Requests;';
+const GS='Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ZILjava/util/concurrent/TimeUnit;JLokhttp3/Interceptor;ZLcom/lagradost/nicehttp/ResponseParser;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;';
+const PS='Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Ljava/lang/Object;Lokhttp3/RequestBody;ZILjava/util/concurrent/TimeUnit;JLokhttp3/Interceptor;ZLcom/lagradost/nicehttp/ResponseParser;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;';
+let files=[],domains={},mains=[],exts=[];
+
+async function loadD(){const u=$('#url').value.trim();if(!u){$('#dm').textContent='Önce linki yaz.';return}
+ try{const r=await fetch(u,{cache:'no-store'});const t=await r.text();$('#dj').value=t;setD(t)}catch(e){$('#dm').textContent='İndirilemedi. JSON içeriğini kutuya yapıştır.'}}
+function setD(t){try{const j=JSON.parse(t);domains={};for(const k in j)if(typeof j[k]=='string')domains[k]=j[k];
+ $('#kl').innerHTML=Object.keys(domains).map(k=>`<option value="${esc(k)}">`).join('');
+ $('#dm').textContent=Object.keys(domains).length+' anahtar: '+Object.keys(domains).join(', ');scan()}catch(e){$('#dm').textContent='Geçersiz JSON'}}
+
+async function addF(fl){$('#err').textContent='';try{for(const f of fl){if(/\.zip$/i.test(f.name)){const a=await readZip(await f.arrayBuffer());if(!a.length)$('#err').textContent=f.name+': zip içinde .smali dosyası yok.';files.push(...a)}else files.push({name:f.webkitRelativePath||f.name,text:await f.text()})}}catch(e){$('#err').textContent='Zip okunamadı: '+e.message}scan()}
+function addP(){const t=$('#pt').value;if(!t.trim())return;files.push({name:$('#pn').value.trim()||'pasted'+files.length+'.smali',text:t});$('#pt').value='';scan()}
+/* yedek inflate: DecompressionStream olmayan tarayıcılar için */
+function inflateRaw(src,usize){
+ const dest=new Uint8Array(usize);let di=0,pos=0,tag=0,bc=0;
+ const T=()=>({t:new Uint16Array(16),x:new Uint16Array(288)});
+ const lt=T(),dt=T(),ct=T(),lens=new Uint8Array(320);
+ const lb=new Uint8Array(30),ls=new Uint16Array(30),db=new Uint8Array(30),ds=new Uint16Array(30);
+ const bb=(b,s,dl,f)=>{let i,sum;for(i=0;i<dl;i++)b[i]=0;for(i=0;i<30-dl;i++)b[i+dl]=(i/dl)|0;for(sum=f,i=0;i<30;i++){s[i]=sum;sum+=1<<b[i]}};
+ bb(lb,ls,4,3);bb(db,ds,2,1);lb[28]=0;ls[28]=258;
+ const build=(t,l,o,n)=>{const offs=new Uint16Array(16);for(let i=0;i<16;i++)t.t[i]=0;for(let i=0;i<n;i++)t.t[l[o+i]]++;t.t[0]=0;let sum=0;for(let i=0;i<16;i++){offs[i]=sum;sum+=t.t[i]}for(let i=0;i<n;i++)if(l[o+i])t.x[offs[l[o+i]]++]=i};
+ const bit=()=>{if(!bc--){tag=src[pos++];bc=7}const b=tag&1;tag>>>=1;return b};
+ const rb=(n,base)=>{if(!n)return base;while(bc<24){tag|=(src[pos++]||0)<<bc;bc+=8}const v=tag&(0xffff>>>(16-n));tag>>>=n;bc-=n;return v+base};
+ const sym=t=>{while(bc<24){tag|=(src[pos++]||0)<<bc;bc+=8}let sum=0,cur=0,len=0,tg=tag;do{cur=2*cur+(tg&1);tg>>>=1;++len;sum+=t.t[len];cur-=t.t[len]}while(cur>=0);tag=tg;bc-=len;return t.x[sum+cur]};
+ const fixed=()=>{let i;for(i=0;i<7;i++)lt.t[i]=0;lt.t[7]=24;lt.t[8]=152;lt.t[9]=112;for(i=0;i<24;i++)lt.x[i]=256+i;for(i=0;i<144;i++)lt.x[24+i]=i;for(i=0;i<8;i++)lt.x[168+i]=280+i;for(i=0;i<112;i++)lt.x[176+i]=144+i;for(i=0;i<5;i++)dt.t[i]=0;dt.t[5]=32;for(i=0;i<32;i++)dt.x[i]=i};
+ const CI=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+ const dyn=()=>{const hl=rb(5,257),hd=rb(5,1),hc=rb(4,4);let i,num,len;for(i=0;i<19;i++)lens[i]=0;for(i=0;i<hc;i++)lens[CI[i]]=rb(3,0);build(ct,lens,0,19);
+  for(num=0;num<hl+hd;){const s=sym(ct);if(s==16){const p=lens[num-1];for(len=rb(2,3);len;--len)lens[num++]=p}else if(s==17){for(len=rb(3,3);len;--len)lens[num++]=0}else if(s==18){for(len=rb(7,11);len;--len)lens[num++]=0}else lens[num++]=s}
+  build(lt,lens,0,hl);build(dt,lens,hl,hd)};
+ const block=()=>{for(;;){let s=sym(lt);if(s==256)return;if(s<256)dest[di++]=s;else{s-=257;const len=rb(lb[s],ls[s]),d=sym(dt),off=di-rb(db[d],ds[d]);for(let i=off;i<off+len;i++)dest[di++]=dest[i]}}};
+ let last;do{last=bit();const type=rb(2,0);
+  if(type==0){while(bc>8){pos--;bc-=8}let len=src[pos+1]*256+src[pos];pos+=4;for(let i=len;i;--i)dest[di++]=src[pos++];bc=0;tag=0}
+  else if(type==1){fixed();block()}else if(type==2){dyn();block()}else throw new Error('inflate: geçersiz blok')}while(!last);
+ return dest}
+
+async function inflate(d,us){try{if(typeof DecompressionStream!=='undefined')return new Uint8Array(await new Response(new Blob([d]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())}catch(e){}return inflateRaw(d,us)}
+async function readZip(buf){
+ const dv=new DataView(buf),u8=new Uint8Array(buf);let e=u8.length-22;while(e>=0&&dv.getUint32(e,true)!=0x06054b50)e--;
+ if(e<0)throw new Error('geçerli bir zip değil');
+ const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const out=[];
+ for(let i=0;i<n;i++){if(dv.getUint32(p,true)!=0x02014b50)throw new Error('zip dizini bozuk');
+  const fl=dv.getUint16(p+8,true),m=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),us=dv.getUint32(p+24,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+  const name=new TextDecoder().decode(u8.subarray(p+46,p+46+nl));p+=46+nl+xl+cl;if(!name.endsWith('.smali'))continue;
+  if(fl&1)throw new Error('şifreli zip desteklenmiyor');if(cs==0xffffffff||us==0xffffffff)throw new Error('ZIP64 desteklenmiyor');
+  const lo=off+30+dv.getUint16(off+26,true)+dv.getUint16(off+28,true);let d=u8.subarray(lo,lo+cs);
+  if(m==8)d=await inflate(d,us);else if(m!=0)throw new Error('desteklenmeyen sıkıştırma ('+m+'): '+name);
+  out.push({name,text:new TextDecoder().decode(d)})}
+ return out}
+function crc(u){let c;const t=crc.t||(crc.t=[...Array(256)].map((_,n)=>{c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;return c>>>0}));let r=-1;for(const b of u)r=t[(r^b)&255]^(r>>>8);return(r^-1)>>>0}
+function mkZip(items){const en=new TextEncoder(),parts=[],cd=[];let off=0,cs=0;
+ for(const it of items){const nb=en.encode(it.name),d=en.encode(it.text),c=crc(d);
+  const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x800,true);h.setUint32(14,c,true);h.setUint32(18,d.length,true);h.setUint32(22,d.length,true);h.setUint16(26,nb.length,true);
+  const g=new DataView(new ArrayBuffer(46));g.setUint32(0,0x02014b50,true);g.setUint16(4,20,true);g.setUint16(6,20,true);g.setUint16(8,0x800,true);g.setUint32(16,c,true);g.setUint32(20,d.length,true);g.setUint32(24,d.length,true);g.setUint16(28,nb.length,true);g.setUint32(42,off,true);
+  parts.push(h.buffer,nb,d);cd.push(g.buffer,nb);off+=30+nb.length+d.length;cs+=46+nb.length}
+ const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,items.length,true);e.setUint16(10,items.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+ return new Blob([...parts,...cd,e.buffer],{type:'application/zip'})}
+
+/* ---- analiz ---- */
+const host=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return''}};
+const CR=/^(\s*)const-string(?:\/jumbo)?\s+([vp]\d+),\s*"([^"]*)"\s*$/;
+function after(L,i,re,reg){for(let j=i+1;j<Math.min(i+16,L.length);j++){const l=L[j],m=l.match(re);if(m)return m;
+  if(l.startsWith('.end method'))return null;
+  if(reg&&new RegExp('^\\s*(?:const(?:-string(?:/jumbo)?|/4|/16|/high16)?|move-result(?:-object)?|new-instance)\\s+'+reg+'\\b').test(l))return null}return null}
+function findMain(f){
+ const L=f.text.split(/\r?\n/),cls=(f.text.match(/^\.class[^\n]*?L([^;\s]+);/m)||[])[1],sup=(f.text.match(/^\.super L([^;]+);/m)||[])[1];
+ if(!cls||!sup)return null;let r=null,name='';
+ for(let i=0;i<L.length;i++){const m=L[i].match(CR);if(!m)continue;
+  if(/^https?:\/\//.test(m[3])&&!r){const n=after(L,i,/^\s*(?:iput-object\s+([vp]\d+),\s*p0,\s*L[^;]+;->mainUrl:Ljava\/lang\/String;|invoke-virtual\s+\{p0,\s*([vp]\d+)\},\s*L[^;]+;->setMainUrl\(Ljava\/lang\/String;\)V)/,m[2]);if(n&&(n[1]||n[2])==m[2])r={li:i,ind:m[1],reg:m[2],url:m[3]}}
+  if(!name){const n=after(L,i,/^\s*iput-object\s+([vp]\d+),\s*p0,\s*L[^;]+;->name:Ljava\/lang\/String;/,m[2]);if(n&&n[1]==m[2])name=m[3]}}
+ if(!r)return null;
+ const cnt=s=>f.text.split(RQ+'->'+s+'$default(').length-1,ok=(s,S)=>f.text.split(RQ+'->'+s+'$default('+RQ+S).length-1;
+ return{...r,cls,sup,name,isMain:sup=='com/lagradost/cloudstream3/MainAPI'||/^\.method [^\n]*\bsetMainUrl\(Ljava\/lang\/String;\)V/m.test(f.text),isExt:/ExtractorApi$/.test(sup),g:ok('get',GS),p:ok('post',PS),gx:cnt('get')-ok('get',GS),px:cnt('post')-ok('post',PS),done:f.text.includes(cls+'$Dom;')}}
+function guess(m){for(const k in domains)if(host(domains[k])==host(m.url))return k;for(const k in domains)if(k.toLowerCase()==m.name.toLowerCase())return k;return m.name||m.cls.split('/').pop()}
+function scan(){
+ const old=Object.fromEntries(mains.map(m=>[m.cls,m.key]));mains=[];exts=[];
+ files.forEach((f,i)=>{const m=findMain(f);if(!m)return;m.fi=i;if(m.isMain){m.key=old[m.cls]||guess(m);mains.push(m)}else if(m.isExt)exts.push(m)});
+ render()}
+function render(){
+ const box=$('#cl');$('#st1').textContent=files.length?files.length+' dosya yüklendi':'eksik';$('#st1').className='b'+(files.length?' ok':'');
+ if(!files.length){box.className='m';box.textContent='Henüz eklenti dosyası yok.';$('#db').style.display='none';return}
+ let h='';
+ mains.forEach((m,i)=>{h+=`<div class="c"><b>${esc(m.cls)}</b><div class="m">Eklentideki domain (yedek olarak korunur): <b style="display:inline">${esc(m.url)}</b><br>get: ${m.g} yönlendirilecek${m.gx?`, <span class=w>${m.gx} farklı imza</span>`:''}; post: ${m.p}${m.px?`, <span class=w>${m.px} farklı imza</span>`:''}${m.done?'<br><span class=w>Zaten yamalı, atlanır.</span>':''}</div>
+  <div class="m">domains.json anahtarı</div><input type="text" list="kl" value="${esc(m.key)}" oninput="mains[${i}].key=this.value"></div>`});
+ if(!mains.length)h='<div class="c w">Ana sınıf bulunamadı.<br>'+diag()+'</div>';
+ exts.forEach(x=>{const same=mains.some(m=>m.url==x.url);h+=`<div class="c"><b>${esc(x.cls)}</b><div class="m ${same?'':'w'}">Extractor: ${same?'mainUrl, güncel alan adına bağlanacak':'ayrı adres ('+esc(x.url)+'), dokunulmaz'}</div></div>`});
+ box.className='';box.innerHTML=h;$('#db').style.display=mains.length?'':'none'}
+
+const clsOf=f=>(f.text.match(/^\.class[^\n]*?L([^;\s]+);/m)||[])[1];
+function diag(){
+ const api=files.filter(f=>/^\.super L[^;]*MainAPI;/m.test(f.text));
+ let h=esc(files.length)+' smali dosyası okundu. ';
+ if(!api.length)return h+'MainAPI\'den türeyen sınıf yok. Ana sınıfın (ör. DiziGom.smali) seçtiğin dosyalarda olduğundan emin ol.';
+ return h+api.map(f=>{const L=f.text.split(/\r?\n/),i=L.findIndex(l=>/->mainUrl:Ljava\/lang\/String;/.test(l)&&/iput-object/.test(l));
+  return '<br><b style="display:inline">'+esc(clsOf(f))+'</b>: '+(i<0?'mainUrl atayan satır yok.':'mainUrl satırı var ama yanında sabit https adresi bulunamadı. Satırdan önceki kod: <code>'+esc(L.slice(Math.max(0,i-6),i+1).map(x=>x.trim()).filter(x=>x&&x[0]!=='.').join(' | '))+'</code>')}).join('')}
+/* ---- yardımcı sınıf (bağımsız, ortak paket gerektirmez) ---- */
+function dom(c,k,f,u){
+ const q=s=>s.replace(/\\/g,'\\\\').replace(/"/g,'\\"'),D=`L${c}$Dom;`,A=`L${c};`,S='Ljava/lang/String;';
+ return String.raw`.class public final ${D}
+.super Ljava/lang/Object;
+.implements Ljava/lang/Runnable;
+
+.field private static volatile api:${A}
+.field private static volatile c0:${S}
+.field private static volatile dom:${S}
+.field private static volatile last:J
+.field private static volatile th:Ljava/lang/Thread;
+
+.method public constructor <init>()V
+    .locals 0
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+    return-void
+.end method
+
+.method public static m(${S})${S}
+    .locals 1
+    sget-object v0, ${D}->dom:${S}
+    if-eqz v0, :n
+    sput-object v0, ${D}->c0:${S}
+    return-object v0
+    :n
+    sput-object p0, ${D}->c0:${S}
+    return-object p0
+.end method
+
+.method public static cur(${S})${S}
+    .locals 2
+    const-string v0, "${q(f)}"
+    invoke-virtual {v0, p0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    move-result v0
+    if-eqz v0, :ret
+    sget-object v0, ${D}->api:${A}
+    if-eqz v0, :ret
+    invoke-virtual {v0}, ${A}->getMainUrl()${S}
+    move-result-object p0
+    :ret
+    return-object p0
+.end method
+
+.method public static reg(${A})V
+    .locals 0
+    sput-object p0, ${D}->api:${A}
+    invoke-static {}, ${D}->kick()V
+    return-void
+.end method
+
+.method public static kick()V
+    .locals 6
+    invoke-static {}, Ljava/lang/System;->currentTimeMillis()J
+    move-result-wide v0
+    sget-wide v2, ${D}->last:J
+    sub-long v2, v0, v2
+    const-wide/32 v4, 0x927c0
+    cmp-long v2, v2, v4
+    if-ltz v2, :skip
+    sput-wide v0, ${D}->last:J
+    new-instance v2, ${D}
+    invoke-direct {v2}, ${D}-><init>()V
+    new-instance v3, Ljava/lang/Thread;
+    invoke-direct {v3, v2}, Ljava/lang/Thread;-><init>(Ljava/lang/Runnable;)V
+    sput-object v3, ${D}->th:Ljava/lang/Thread;
+    invoke-virtual {v3}, Ljava/lang/Thread;->start()V
+    :skip
+    return-void
+.end method
+
+.method public static await()V
+    .locals 3
+    sget-object v0, ${D}->dom:${S}
+    if-nez v0, :ret
+    sget-object v0, ${D}->th:Ljava/lang/Thread;
+    if-eqz v0, :ret
+    invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;
+    move-result-object v1
+    invoke-static {}, Landroid/os/Looper;->myLooper()Landroid/os/Looper;
+    move-result-object v2
+    if-eq v1, v2, :ret
+    :try_start_0
+    const-wide/16 v1, 0xfa0
+    invoke-virtual {v0, v1, v2}, Ljava/lang/Thread;->join(J)V
+    :try_end_0
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
+    :catch_0
+    :ret
+    return-void
+.end method
+
+.method private static r1(${S}${S}${S})${S}
+    .locals 2
+    if-eqz p1, :ret
+    invoke-virtual {p1, p2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    move-result v0
+    if-nez v0, :ret
+    invoke-virtual {p0, p2}, Ljava/lang/String;->startsWith(${S})Z
+    move-result v0
+    if-nez v0, :ret
+    invoke-virtual {p0, p1}, Ljava/lang/String;->startsWith(${S})Z
+    move-result v0
+    if-eqz v0, :ret
+    invoke-virtual {p1}, Ljava/lang/String;->length()I
+    move-result v0
+    invoke-virtual {p0, v0}, Ljava/lang/String;->substring(I)${S}
+    move-result-object v0
+    invoke-virtual {p2, v0}, Ljava/lang/String;->concat(${S})${S}
+    move-result-object p0
+    :ret
+    return-object p0
+.end method
+
+.method public static rw(${S})${S}
+    .locals 2
+    if-nez p0, :a
+    return-object p0
+    :a
+    sget-object v0, ${D}->api:${A}
+    if-nez v0, :b
+    return-object p0
+    :b
+    invoke-virtual {v0}, ${A}->getMainUrl()${S}
+    move-result-object v0
+    sget-object v1, ${D}->c0:${S}
+    invoke-static {p0, v1, v0}, ${D}->r1(${S}${S}${S})${S}
+    move-result-object p0
+    const-string v1, "${q(f)}"
+    invoke-static {p0, v1, v0}, ${D}->r1(${S}${S}${S})${S}
+    move-result-object p0
+    return-object p0
+.end method
+
+.method public static get(${RQ}${GS}
+    .locals 1
+    invoke-static {}, ${D}->kick()V
+    invoke-static {}, ${D}->await()V
+    invoke-static {p1}, ${D}->rw(${S})${S}
+    move-result-object p1
+    invoke-static/range {p0 .. p16}, ${RQ}->get$default(${RQ}${GS}
+    move-result-object v0
+    return-object v0
+.end method
+
+.method public static post(${RQ}${PS}
+    .locals 1
+    invoke-static {}, ${D}->kick()V
+    invoke-static {}, ${D}->await()V
+    invoke-static {p1}, ${D}->rw(${S})${S}
+    move-result-object p1
+    invoke-static/range {p0 .. p20}, ${RQ}->post$default(${RQ}${PS}
+    move-result-object v0
+    return-object v0
+.end method
+
+.method public run()V
+    .locals 6
+    :try_start_0
+    new-instance v0, Ljava/net/URL;
+    const-string v1, "${q(u)}"
+    invoke-direct {v0, v1}, Ljava/net/URL;-><init>(${S})V
+    invoke-virtual {v0}, Ljava/net/URL;->openConnection()Ljava/net/URLConnection;
+    move-result-object v0
+    check-cast v0, Ljava/net/HttpURLConnection;
+    const/16 v1, 0x1388
+    invoke-virtual {v0, v1}, Ljava/net/HttpURLConnection;->setConnectTimeout(I)V
+    invoke-virtual {v0, v1}, Ljava/net/HttpURLConnection;->setReadTimeout(I)V
+    const/4 v1, 0x0
+    invoke-virtual {v0, v1}, Ljava/net/HttpURLConnection;->setUseCaches(Z)V
+    invoke-virtual {v0}, Ljava/net/HttpURLConnection;->getInputStream()Ljava/io/InputStream;
+    move-result-object v0
+    new-instance v1, Ljava/util/Scanner;
+    const-string v2, "UTF-8"
+    invoke-direct {v1, v0, v2}, Ljava/util/Scanner;-><init>(Ljava/io/InputStream;${S})V
+    const-string v2, "\\A"
+    invoke-virtual {v1, v2}, Ljava/util/Scanner;->useDelimiter(${S})Ljava/util/Scanner;
+    move-result-object v1
+    invoke-virtual {v1}, Ljava/util/Scanner;->next()${S}
+    move-result-object v1
+    new-instance v2, Lorg/json/JSONObject;
+    invoke-direct {v2, v1}, Lorg/json/JSONObject;-><init>(${S})V
+    const-string v3, "${q(k)}"
+    invoke-virtual {v2, v3}, Lorg/json/JSONObject;->optString(${S})${S}
+    move-result-object v3
+    invoke-virtual {v3}, Ljava/lang/String;->trim()${S}
+    move-result-object v3
+    const-string v4, "https://"
+    invoke-virtual {v3, v4}, Ljava/lang/String;->startsWith(${S})Z
+    move-result v4
+    if-eqz v4, :done
+    const-string v4, "/+$"
+    const-string v5, ""
+    invoke-virtual {v3, v4, v5}, Ljava/lang/String;->replaceAll(${S}${S})${S}
+    move-result-object v3
+    sput-object v3, ${D}->dom:${S}
+    sget-object v4, ${D}->api:${A}
+    if-eqz v4, :done
+    invoke-virtual {v4, v3}, ${A}->setMainUrl(${S})V
+    :done
+    :try_end_0
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
+    :catch_0
+    return-void
+.end method
+`}
+
+/* ---- yama ---- */
+function patchMain(f,m){
+ const eol=f.text.includes('\r\n')?'\r\n':'\n',L=f.text.split(/\r?\n/),D=`L${m.cls}$Dom;`,w=[],R=m.reg;
+ L[m.li]=`${m.ind}const-string ${R}, "${m.url}"${eol}${m.ind}invoke-static/range {${R} .. ${R}}, ${D}->m(Ljava/lang/String;)Ljava/lang/String;${eol}${m.ind}move-result-object ${R}`;
+ let st=m.li;while(st>=0&&!L[st].startsWith('.method'))st--;
+ const re=new RegExp('^\\s*invoke-direct(?:/range)?\\s*\\{p0[^}]*\\},\\s*L'+rx(m.sup)+';-><init>');let ok=false;
+ for(let j=st+1;j<m.li;j++)if(re.test(L[j])){L[j]+=`${eol}    invoke-static/range {p0 .. p0}, ${D}->reg(L${m.cls};)V`;ok=true;break}
+ if(!ok)w.push(m.cls+': süper constructor çağrısı bulunamadı, reg() eklenemedi.');
+ for(let i=0;i<L.length;i++)if(L[i].includes('invoke-static')){
+  if(L[i].includes(RQ+'->get$default('+RQ+GS))L[i]=L[i].split(RQ+'->get$default(').join(D+'->get(');
+  else if(L[i].includes(RQ+'->post$default('+RQ+PS))L[i]=L[i].split(RQ+'->post$default(').join(D+'->post(')}
+ return{text:L.join(eol),w}}
+function patchExt(x,mc){
+ const T=files[x.fi].text,eol=T.includes('\r\n')?'\r\n':'\n',L=T.split(/\r?\n/);
+ const i=L.findIndex(l=>/^\.method [^\n]*\bgetMainUrl\(\)Ljava\/lang\/String;/.test(l));if(i<0)return null;
+ for(let j=i+1;j<L.length&&!L[j].startsWith('.end method');j++){const m=L[j].match(/^\s*iget-object\s+([vp]\d+),\s*p0,\s*L[^;]+;->mainUrl:Ljava\/lang\/String;/);
+  if(m){L[j]+=`${eol}    invoke-static/range {${m[1]} .. ${m[1]}}, L${mc}$Dom;->cur(Ljava/lang/String;)Ljava/lang/String;${eol}    move-result-object ${m[1]}`;return L.join(eol)}}
+ return null}
+function dl(){
+ const u=$('#url').value.trim();
+ if(!/^https:\/\//.test(u)){alert('2. adımda https:// ile başlayan domains.json linkini yaz.');return}
+ const out=[],msg=[];
+ for(const m of mains){if(!m.key.trim()){alert(m.cls+' için anahtar girin.');return}}
+ mains.forEach(m=>{if(m.done)return;const f=files[m.fi],r=patchMain(f,m);msg.push(...r.w);
+  out.push({name:f.name,text:r.text});out.push({name:m.cls+'$Dom.smali',text:dom(m.cls,m.key.trim(),m.url,u)})});
+ exts.forEach(x=>{const m=mains.find(z=>z.url==x.url&&!z.done);if(!m)return;const t=patchExt(x,m.cls);if(t)out.push({name:files[x.fi].name,text:t});else msg.push(x.cls.split('/').pop()+': getMainUrl() yamalanamadı.')});
+ if(!out.length){alert('Yamalanacak dosya yok.');return}
+ save(mkZip(out),'yamali-eklenti.zip');if(msg.length)alert(msg.join('\n'))}
+function save(b,n){const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click()}
+</script></body></html>
