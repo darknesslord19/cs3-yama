@@ -1,0 +1,10 @@
+Mod: ayar ekranlı domain sistemi
+Kontrol raporu⚠ DiziGom: 0 get, 0 post yönlendirilecek (zaten yamalı)
+✓ DiziGomWebViewExtractor (extractor): mainUrl, güncel alan adına bağlanacak
+⚠ Sabit kalan başka adresler (oynatıcı/CDN olabilir, otomatik değişmez): play2.pilavyerplay.top, spidypro.com, raw.githubusercontent.com ×2, t.me ×4, example.com, ornekadres.com
+⚠ Domain dosyalarında kalan marka/bağlantı izleri: https://kreosus.com/wiojelt (bu metinler kullanılmayan ekranlarda olabilir, "Tüm görünen metinler" veya "Ek değişiklikler" ile değiştirilebilir)
+✓ Tüm Telegram adresleri https://t.me/darknes_lord oldu.
+✓ 12 domains-zip dosyası kullanılmadığı için eklenmiyor (ör. SupportNotice$$ExternalSyntheticLambda0, SupportNotice$$ExternalSyntheticLambda1, SupportNotice$$ExternalSyntheticLambda2).
+⚠ Paket yolu dev/wiojelt/turksinema/common marka adı içeriyor. İstersen 3. adımdaki "Paket yolu" alanından değiştir.
+✓ Plugin: DiziGomPluginEntry load() yamalandı, manifest değişmez.
+Dosyalar: 56 değişti, 0 eklendi
